@@ -1,0 +1,31 @@
+# Gradle / Android
+.gradle/
+build/
+app/build/
+*.iml
+.idea/
+local.properties
+.DS_Store
+
+# Native build
+.cxx/
+app/.cxx/
+*.o
+*.so
+
+# Models / Large weights
+*.onnx
+*.tflite
+*.bin
+*.gguf
+app/src/main/assets/*.tflite
+app/src/main/assets/*.onnx
+
+# Python venv
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+
+# Logs
+*.log

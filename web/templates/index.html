@@ -1,0 +1,1126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AI Hardware Detector</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#0f1117;--surface:#1a1d27;--surface2:#232635;--border:#2e3248;
+    --accent:#6c63ff;--accent2:#9d97ff;--green:#22c55e;--red:#ef4444;
+    --yellow:#f59e0b;--text:#e2e8f0;--muted:#64748b;--radius:10px;
+  }
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);display:flex;height:100vh;overflow:hidden;font-size:14px}
+
+  /* Sidebar */
+  #sidebar{width:260px;min-width:260px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+  #sidebar h1{font-size:15px;font-weight:700;padding:18px 16px 14px;color:var(--accent2);letter-spacing:.5px;border-bottom:1px solid var(--border);white-space:nowrap}
+  #sidebar h1 span{color:var(--muted);font-weight:400}
+  .sidebar-section{padding:12px 12px 0}
+  .sidebar-section h3{font-size:11px;font-weight:600;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;padding:0 4px}
+  .device-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;margin-bottom:8px;cursor:pointer;transition:.15s}
+  .device-card:hover{border-color:var(--accent)}
+  .device-card.selected{border-color:var(--accent);background:#2a2d45}
+  .device-card .d-name{font-weight:600;font-size:13px;display:flex;align-items:center;gap:6px}
+  .device-card .d-meta{color:var(--muted);font-size:11px;margin-top:3px}
+  .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+  .dot.online{background:var(--green)}
+  .dot.offline{background:var(--red)}
+  .dot.pending{background:var(--yellow);animation:pulse 1s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+  .btn-ghost{background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;transition:.15s}
+  .btn-ghost:hover{border-color:var(--accent);color:var(--text)}
+  .btn{display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:13px;cursor:pointer;font-weight:500;transition:.15s}
+  .btn:hover{background:var(--accent2)}
+  .btn:disabled{opacity:.5;cursor:default}
+  .btn-sm{padding:5px 10px;font-size:12px}
+  .btn-danger{background:#7f1d1d;color:#fca5a5}
+  .btn-danger:hover{background:var(--red);color:#fff}
+  .sidebar-footer{margin-top:auto;padding:12px}
+
+  /* Main */
+  #main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+  #topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;gap:12px;min-height:50px}
+  #topbar .device-label{font-size:13px;color:var(--muted)}
+  #topbar .device-name{font-weight:600;color:var(--text)}
+  #topbar .ping-badge{background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:11px;color:var(--muted)}
+
+  /* Tabs */
+  #tabs{display:flex;gap:2px;padding:0 20px;background:var(--surface);border-bottom:1px solid var(--border)}
+  .tab{padding:11px 16px;font-size:13px;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;transition:.15s;white-space:nowrap}
+  .tab:hover{color:var(--text)}
+  .tab.active{color:var(--accent2);border-bottom-color:var(--accent)}
+
+  /* Content */
+  #content{flex:1;overflow-y:auto;padding:16px}
+  #panel-detect,#panel-classify{height:calc(100vh - 130px)}
+  .panel{display:none}
+  .panel.active{display:block}
+
+  /* Cards */
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:16px}
+  .card h2{font-size:14px;font-weight:600;margin-bottom:14px;color:var(--accent2)}
+
+  /* Form */
+  .form-row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px}
+  .form-group{display:flex;flex-direction:column;gap:5px;flex:1;min-width:120px}
+  label{font-size:12px;color:var(--muted);font-weight:500}
+  input,select,textarea{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:7px 10px;color:var(--text);font-size:13px;outline:none;width:100%;font-family:inherit}
+  input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+  input[type=range]{padding:0;height:20px;accent-color:var(--accent)}
+  textarea{resize:vertical;min-height:80px}
+
+  /* Drop zone */
+  .dropzone{border:2px dashed var(--border);border-radius:var(--radius);padding:30px;text-align:center;cursor:pointer;transition:.15s;color:var(--muted)}
+  .dropzone:hover,.dropzone.drag{border-color:var(--accent);color:var(--text);background:rgba(108,99,255,.05)}
+  .dropzone img{max-height:200px;max-width:100%;border-radius:6px;margin-top:10px}
+
+  /* Results */
+  .result-box{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-top:14px;max-height:400px;overflow-y:auto}
+  .detection-item{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border)}
+  .detection-item:last-child{border:none}
+  .det-label{font-weight:600}
+  .det-conf{color:var(--accent2);font-size:12px;font-weight:500}
+  .conf-bar{height:4px;border-radius:2px;background:var(--accent);margin-top:3px}
+  .chip{display:inline-block;background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:2px 8px;font-size:11px;margin:2px}
+  .chip.good{border-color:var(--green);color:var(--green)}
+  .chip.bad{border-color:var(--red);color:var(--red)}
+
+  /* Hardware grid */
+  .hw-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
+  .hw-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px}
+  .hw-card .hw-type{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .hw-card .hw-name{font-size:13px;font-weight:600;margin:4px 0}
+  .hw-card .hw-tops{font-size:20px;font-weight:700;color:var(--accent2)}
+
+  /* Chat */
+  #chat-log{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:14px;height:320px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;margin-bottom:12px}
+  .msg{max-width:80%;padding:10px 14px;border-radius:10px;font-size:13px;line-height:1.5}
+  .msg.user{background:var(--accent);align-self:flex-end;border-radius:10px 10px 2px 10px}
+  .msg.assistant{background:var(--surface);border:1px solid var(--border);align-self:flex-start;border-radius:10px 10px 10px 2px}
+  .msg .meta{font-size:10px;color:rgba(255,255,255,.5);margin-top:4px}
+
+  /* Benchmark */
+  .bench-row{display:grid;grid-template-columns:120px 80px 80px 80px 80px 1fr;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px}
+  .bench-row:last-child{border:none}
+  .bench-header{color:var(--muted);font-size:11px;font-weight:600;text-transform:uppercase}
+
+  /* Status */
+  .stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}
+  .stat-box{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px}
+  .stat-box .stat-label{font-size:11px;color:var(--muted)}
+  .stat-box .stat-value{font-size:20px;font-weight:700;color:var(--text);margin-top:2px}
+  .stat-box .stat-unit{font-size:11px;color:var(--muted)}
+
+  /* Modal */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:100;display:none}
+  .modal-overlay.open{display:flex}
+  .modal{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;width:380px;max-width:90vw}
+  .modal h2{font-size:15px;font-weight:600;margin-bottom:16px;color:var(--accent2)}
+
+  /* Alerts */
+  .alert{padding:10px 14px;border-radius:6px;font-size:13px;margin-bottom:12px}
+  .alert.error{background:#450a0a;border:1px solid #7f1d1d;color:#fca5a5}
+  .alert.success{background:#052e16;border:1px solid #14532d;color:#86efac}
+
+  /* Spinner */
+  .spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.2);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  ::-webkit-scrollbar{width:5px;height:5px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+  .empty-state{text-align:center;padding:40px 20px;color:var(--muted)}
+  .empty-state .icon{font-size:40px;margin-bottom:10px}
+</style>
+</head>
+<body>
+
+<!-- ── Sidebar ── -->
+<aside id="sidebar">
+  <h1>AI Detector <span>Client</span></h1>
+
+  <div class="sidebar-section">
+    <h3>Devices</h3>
+    <div id="device-list"></div>
+    <button class="btn btn-sm" style="width:100%;justify-content:center;margin-bottom:8px" onclick="openAddModal()">+ Add Device</button>
+    <button class="btn-ghost btn-sm" style="width:100%;margin-bottom:4px" onclick="openDiscoverModal()">Auto-Discover</button>
+  </div>
+
+  <div class="sidebar-footer">
+    <div id="selected-info" style="font-size:11px;color:var(--muted);text-align:center"></div>
+  </div>
+</aside>
+
+<!-- ── Main ── -->
+<div id="main">
+  <div id="topbar">
+    <div>
+      <div class="device-label">Selected Device</div>
+      <div class="device-name" id="topbar-device">— None —</div>
+    </div>
+    <div id="topbar-ping" class="ping-badge" style="display:none"></div>
+    <div style="margin-left:auto;display:flex;gap:8px">
+      <button class="btn-ghost btn-sm" onclick="refreshStatus()">Refresh</button>
+    </div>
+  </div>
+
+  <div id="tabs">
+    <div class="tab active" onclick="switchTab('status')">Status</div>
+    <div class="tab" onclick="switchTab('detect')">Detect</div>
+    <div class="tab" onclick="switchTab('classify')">Classify</div>
+    <div class="tab" onclick="switchTab('llm')">LLM Chat</div>
+    <div class="tab" onclick="switchTab('benchmark')">Benchmark</div>
+    <div class="tab" onclick="switchTab('rembg')">Remove BG</div>
+    <div class="tab" onclick="switchTab('models')">Models</div>
+  </div>
+
+  <div id="content">
+
+    <!-- Status -->
+    <div class="panel active" id="panel-status">
+      <div id="status-content">
+        <div class="empty-state"><div class="icon">📱</div>Select or add a device to get started</div>
+      </div>
+    </div>
+
+    <!-- Detect -->
+    <div class="panel" id="panel-detect">
+      <div style="display:grid;grid-template-columns:1fr 340px;gap:16px;height:100%">
+        <!-- Image area -->
+        <div class="card" style="display:flex;flex-direction:column;gap:12px">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <h2 style="margin:0">Image</h2>
+            <label class="btn btn-sm" style="cursor:pointer">Upload Image
+              <input type="file" id="det-file" accept="image/*" style="display:none" onchange="loadDetectImage(this)"/>
+            </label>
+          </div>
+          <div id="det-drop" class="dropzone" style="flex:1;display:flex;align-items:center;justify-content:center;position:relative;min-height:300px;padding:0">
+            <div id="det-placeholder" style="text-align:center;color:var(--muted);pointer-events:none">
+              <div style="font-size:36px;margin-bottom:8px">🖼️</div>
+              <div>Drag & drop or click Upload Image</div>
+              <div style="font-size:11px;margin-top:4px">JPG, PNG, WEBP — any size, auto-resized before sending</div>
+            </div>
+            <canvas id="det-canvas" style="display:none;max-width:100%;max-height:100%;border-radius:8px"></canvas>
+          </div>
+        </div>
+        <!-- Controls + results -->
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div class="card">
+            <h2>Settings</h2>
+            <div class="form-group" style="margin-bottom:10px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
+                <label style="margin:0">Model</label>
+                <button class="btn-ghost btn-sm" onclick="refreshDetectModels()" style="font-size:10px">↻ Refresh</button>
+              </div>
+              <select id="det-model" style="width:100%">
+                <option value="ssd_mobilenet_v2.tflite">ssd_mobilenet_v2.tflite</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin-bottom:10px">
+              <label>Accelerator</label>
+              <select id="det-accel" style="width:100%">
+                <option value="">Auto (recommended)</option>
+                <option>NPU</option><option>GPU</option><option>DSP</option><option>CPU</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin-bottom:14px">
+              <label>Min Confidence: <strong id="det-conf-val">0.50</strong></label>
+              <input type="range" id="det-conf" min="0" max="1" step="0.05" value="0.5"
+                oninput="document.getElementById('det-conf-val').textContent=parseFloat(this.value).toFixed(2)"/>
+            </div>
+            <button class="btn" onclick="runDetect()" id="det-btn" style="width:100%;justify-content:center">Run Detection</button>
+          </div>
+          <div class="card" style="flex:1;overflow-y:auto">
+            <h2>Results</h2>
+            <div id="det-result"><div style="color:var(--muted);font-size:12px">Run detection to see results</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Classify -->
+    <div class="panel" id="panel-classify">
+      <div style="display:grid;grid-template-columns:1fr 340px;gap:16px;height:100%">
+        <!-- Image area -->
+        <div class="card" style="display:flex;flex-direction:column;gap:12px">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <h2 style="margin:0">Image</h2>
+            <label class="btn btn-sm" style="cursor:pointer">Upload Image
+              <input type="file" id="cls-file" accept="image/*" style="display:none" onchange="loadClassifyImage(this)"/>
+            </label>
+          </div>
+          <div id="cls-drop" class="dropzone" style="flex:1;display:flex;align-items:center;justify-content:center;min-height:300px;padding:0">
+            <div id="cls-placeholder" style="text-align:center;color:var(--muted);pointer-events:none">
+              <div style="font-size:36px;margin-bottom:8px">🖼️</div>
+              <div>Drag & drop or click Upload Image</div>
+              <div style="font-size:11px;margin-top:4px">JPG, PNG, WEBP — any size</div>
+            </div>
+            <img id="cls-preview" style="display:none;max-width:100%;max-height:100%;border-radius:8px"/>
+          </div>
+        </div>
+        <!-- Controls + results -->
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div class="card">
+            <h2>Settings</h2>
+            <div class="form-group" style="margin-bottom:10px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
+                <label style="margin:0">Model</label>
+                <button class="btn-ghost btn-sm" onclick="refreshClassifyModels()" style="font-size:10px">↻ Refresh</button>
+              </div>
+              <select id="cls-model" style="width:100%">
+                <option value="efficientnet_lite0.tflite">efficientnet_lite0.tflite</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin-bottom:14px">
+              <label>Top-K results</label>
+              <input type="number" id="cls-topk" value="5" min="1" max="50" style="width:100%"/>
+            </div>
+            <button class="btn" onclick="runClassify()" id="cls-btn" style="width:100%;justify-content:center">Run Classification</button>
+          </div>
+          <div class="card" style="flex:1;overflow-y:auto">
+            <h2>Results</h2>
+            <div id="cls-result"><div style="color:var(--muted);font-size:12px">Run classification to see results</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LLM -->
+    <div class="panel" id="panel-llm">
+      <div class="card" style="display:flex;flex-direction:column;height:calc(100vh - 160px)">
+        <h2>LLM Chat</h2>
+        <div class="form-row" style="margin-bottom:8px">
+          <div class="form-group" style="flex:2">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
+              <label style="margin:0">Model</label>
+              <button class="btn-ghost btn-sm" onclick="refreshLlmModels()" style="font-size:10px">↻ Refresh</button>
+            </div>
+            <select id="llm-model" style="width:100%">
+              <option value="tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf">TinyLlama 1.1B Q4_K_M (~670MB)</option>
+              <option value="phi-3-mini-4k-instruct-q4.gguf">Phi-3-mini 4k Q4 (~2.2GB)</option>
+              <option value="gemma-2-2b-it-Q4_K_M.gguf">Gemma 2 2B IT Q4 (~1.5GB)</option>
+              <option value="qwen2-0.5b-instruct-q8_0.gguf">Qwen2 0.5B Q8 (~530MB)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Max Tokens</label>
+            <input type="number" id="llm-maxtok" value="256" min="1" max="2048"/>
+          </div>
+          <div class="form-group">
+            <label>Temperature <span id="llm-temp-val">0.7</span></label>
+            <input type="range" id="llm-temp" min="0" max="1" step="0.05" value="0.7" oninput="document.getElementById('llm-temp-val').textContent=parseFloat(this.value).toFixed(2)"/>
+          </div>
+          <div>
+            <button class="btn-ghost btn-sm" onclick="clearChat()" style="margin-top:18px">Clear</button>
+          </div>
+        </div>
+        <div id="chat-log"></div>
+        <div style="display:flex;gap:8px">
+          <textarea id="llm-prompt" placeholder="Type a message..." style="flex:1;min-height:60px" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}"></textarea>
+          <button class="btn" onclick="sendChat()" id="llm-btn" style="align-self:flex-end">Send</button>
+        </div>
+        <div id="llm-meta" style="font-size:11px;color:var(--muted);margin-top:6px"></div>
+        <div style="font-size:11px;color:var(--yellow);margin-top:4px">⚠ LLM requires a compatible .tflite model uploaded via the Models tab. Gemma 2B (~1.5GB) or TinyLlama are recommended.</div>
+      </div>
+    </div>
+
+    <!-- Benchmark -->
+    <div class="panel" id="panel-benchmark">
+      <div class="card">
+        <h2>Benchmark</h2>
+        <div class="form-row">
+          <div class="form-group" style="flex:2">
+            <label>Model</label>
+            <input id="bench-model" value="model.tflite"/>
+          </div>
+          <div class="form-group">
+            <label>Type</label>
+            <select id="bench-type">
+              <option>IMAGE_CLASSIFICATION</option>
+              <option>OBJECT_DETECTION</option>
+              <option>TEXT_GENERATION</option>
+            </select>
+          </div>
+          <div>
+            <button class="btn" onclick="runBenchmark()" id="bench-btn" style="margin-top:18px">Run Benchmark</button>
+          </div>
+        </div>
+        <div id="bench-result"></div>
+      </div>
+    </div>
+
+    <!-- Remove Background -->
+    <div class="panel" id="panel-rembg">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;height:100%">
+        <!-- Input -->
+        <div class="card" style="display:flex;flex-direction:column;gap:12px">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <h2 style="margin:0">Original</h2>
+            <label class="btn btn-sm" style="cursor:pointer">Upload Image
+              <input type="file" id="rembg-file" accept="image/*" style="display:none" onchange="loadRembgImage(this)"/>
+            </label>
+          </div>
+          <div id="rembg-drop" class="dropzone" style="flex:1;display:flex;align-items:center;justify-content:center;min-height:300px;padding:0">
+            <div id="rembg-placeholder" style="text-align:center;color:var(--muted);pointer-events:none">
+              <div style="font-size:36px;margin-bottom:8px">🖼️</div>
+              <div>Drag & drop or click Upload Image</div>
+              <div style="font-size:11px;margin-top:4px">JPG, PNG, WEBP — any size</div>
+            </div>
+            <img id="rembg-preview" style="display:none;max-width:100%;max-height:100%;border-radius:8px"/>
+          </div>
+        </div>
+        <!-- Output -->
+        <div class="card" style="display:flex;flex-direction:column;gap:12px">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <h2 style="margin:0">Result</h2>
+            <a id="rembg-download" class="btn btn-sm" style="display:none;text-decoration:none" download="removed_bg.png">Download PNG</a>
+          </div>
+          <!-- Checkered background to show transparency -->
+          <div style="flex:1;border-radius:8px;overflow:hidden;background:repeating-conic-gradient(#3a3a4a 0% 25%, #2a2a3a 0% 50%) 0 0 / 20px 20px;min-height:300px;display:flex;align-items:center;justify-content:center">
+            <div id="rembg-result-placeholder" style="text-align:center;color:var(--muted)">
+              <div style="font-size:36px;margin-bottom:8px">✂️</div>
+              <div>Background removed image will appear here</div>
+            </div>
+            <img id="rembg-result" style="display:none;max-width:100%;max-height:100%"/>
+          </div>
+          <div style="display:flex;gap:8px;align-items:flex-end">
+            <div class="form-group" style="flex:2;margin:0">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
+                <label style="margin:0">Model</label>
+                <button class="btn-ghost btn-sm" onclick="refreshRembgModels()" style="font-size:10px">↻ Refresh</button>
+              </div>
+              <select id="rembg-model" style="width:100%">
+                <option value="rmbg2.tflite">rmbg2.tflite — RMBG-1.4 (built-in, 176MB)</option>
+              </select>
+            </div>
+            <button class="btn" onclick="runRembg()" id="rembg-btn" style="align-self:flex-end">Remove Background</button>
+            <button class="btn btn-sm" onclick="runRembgBenchmark()" id="rembg-bench-btn" style="align-self:flex-end;background:var(--surface2);border:1px solid var(--border);color:var(--text)">Benchmark</button>
+          </div>
+          <div id="rembg-meta" style="font-size:11px;color:var(--muted)"></div>
+          <div id="rembg-bench-result"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Models -->
+    <div class="panel" id="panel-models">
+      <div class="card">
+        <h2>Loaded Models</h2>
+        <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
+          <button class="btn btn-sm" onclick="loadModels()">Refresh</button>
+          <select id="upload-model-type" style="width:180px;font-size:12px">
+            <option value="OBJECT_DETECTION">Object Detection</option>
+            <option value="IMAGE_CLASSIFICATION">Image Classification</option>
+            <option value="LLM_INFERENCE">LLM Inference</option>
+            <option value="VIDEO_DETECTION">Video Detection</option>
+            <option value="POSE_ESTIMATION">Pose Estimation</option>
+            <option value="SEGMENTATION">Segmentation</option>
+            <option value="OCR">OCR</option>
+            <option value="AUDIO_CLASSIFICATION">Audio Classification</option>
+          </select>
+          <label class="btn btn-sm" style="cursor:pointer">Upload &amp; Load Model <input type="file" accept=".tflite" style="display:none" onchange="uploadModel(this)"/></label>
+        </div>
+        <div id="models-list"></div>
+        <div style="font-size:11px;color:var(--muted);margin-top:10px">
+          Models are uploaded to the phone and auto-loaded. After loading, use the model's <strong>name</strong> (e.g. <code>mymodel.tflite</code>) in the Detect/Classify tabs.
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<!-- Add Device Modal -->
+<div class="modal-overlay" id="add-modal">
+  <div class="modal">
+    <h2>Add Device</h2>
+    <div id="add-modal-alert"></div>
+    <div class="form-group" style="margin-bottom:10px">
+      <label>IP Address / Hostname</label>
+      <input id="add-host" placeholder="192.168.1.50"/>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Port</label>
+        <input id="add-port" value="8080" type="number"/>
+      </div>
+      <div class="form-group">
+        <label>API Key (optional)</label>
+        <input id="add-key" placeholder=""/>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
+      <button class="btn-ghost" onclick="closeAddModal()">Cancel</button>
+      <button class="btn" onclick="addDevice()" id="add-btn">Connect</button>
+    </div>
+  </div>
+</div>
+
+<!-- Discover Modal -->
+<div class="modal-overlay" id="discover-modal">
+  <div class="modal">
+    <h2>Auto-Discover Devices</h2>
+    <div id="discover-alert"></div>
+    <div class="form-row">
+      <div class="form-group" style="flex:2">
+        <label>Subnet</label>
+        <input id="disc-subnet" value="192.168.1"/>
+      </div>
+      <div class="form-group">
+        <label>Port</label>
+        <input id="disc-port" value="8080" type="number"/>
+      </div>
+    </div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:14px">Scans .1–.254 on the given subnet. May take 10–30 seconds.</p>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn-ghost" onclick="closeDiscoverModal()">Cancel</button>
+      <button class="btn" onclick="runDiscover()" id="disc-btn">Scan</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let selectedDevice = null;
+let chatHistory = [];
+
+// ── Devices ──────────────────────────────────────────────────────────────────
+
+async function loadDevices() {
+  const res = await fetch('/api/devices');
+  const devices = await res.json();
+  const list = document.getElementById('device-list');
+  if (devices.length === 0) {
+    list.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:4px 4px 12px">No devices added yet</div>';
+    return;
+  }
+  list.innerHTML = devices.map(d => `
+    <div class="device-card ${d.key === selectedDevice ? 'selected' : ''}" onclick="selectDevice('${d.key}')">
+      <div class="d-name">
+        <span class="dot ${d.online ? 'online' : 'offline'}"></span>
+        ${d.online ? (d.status?.device || d.key) : d.key}
+        <button class="btn-ghost btn-sm" style="margin-left:auto;padding:2px 6px" onclick="event.stopPropagation();removeDevice('${d.key}')">✕</button>
+      </div>
+      <div class="d-meta">${d.key} ${d.online ? '· ' + d.ping + 'ms' : '· offline'}</div>
+    </div>
+  `).join('');
+}
+
+async function selectDevice(key) {
+  selectedDevice = key;
+  document.getElementById('topbar-device').textContent = key;
+  await loadDevices();
+  await refreshStatus();
+  await populateModelSelects(key);
+}
+
+async function populateModelSelects(key) {
+  try {
+    const res = await fetch(`/api/models?device=${encodeURIComponent(key)}`);
+    const data = await res.json();
+    if (!data.models) return;
+
+    const all    = data.models.map(m => m.name);
+    const tflite = data.models.filter(m => m.name.endsWith('.tflite') || m.name.endsWith('.onnx')).map(m => m.name);
+    const gguf   = data.models.filter(m => m.name.endsWith('.gguf')).map(m => m.name);
+
+    fillSelect('det-model',   tflite.length ? tflite : all,  'ssd_mobilenet_v2.tflite');
+    fillSelect('cls-model',   tflite.length ? tflite : all,  'efficientnet_lite0.tflite');
+    fillSelect('llm-model',   gguf.length   ? gguf   : all,  '');
+    fillSelect('rembg-model', all, 'rmbg2.tflite');
+
+    // bench-model é input de texto — só atualiza se estiver com valor padrão
+    const benchInput = document.getElementById('bench-model');
+    if (benchInput && (benchInput.value === 'model.tflite' || benchInput.value === '')) {
+      benchInput.value = all[0] || 'model.tflite';
+    }
+  } catch(e) { console.warn('populateModelSelects:', e); }
+}
+
+function fillSelect(id, options, preferred) {
+  const sel = document.getElementById(id);
+  if (!sel || options.length === 0) return;
+  sel.innerHTML = options.map(name =>
+    `<option value="${name}" ${name === preferred ? 'selected' : ''}>${name}</option>`
+  ).join('');
+  // se preferred não está na lista, seleciona o primeiro
+  if (!options.includes(preferred)) sel.selectedIndex = 0;
+}
+
+async function refreshStatus() {
+  if (!selectedDevice) return;
+  const ping = document.getElementById('topbar-ping');
+  try {
+    const res = await fetch(`/api/devices/${encodeURIComponent(selectedDevice)}/status`);
+    const data = await res.json();
+    if (data.error) { showStatusError(data.error); return; }
+    ping.textContent = data.ping + 'ms';
+    ping.style.display = '';
+    document.getElementById('topbar-device').textContent = data.status?.device || selectedDevice;
+    renderStatus(data);
+  } catch(e) {
+    showStatusError(e.message);
+  }
+}
+
+function renderStatus(data) {
+  const s = data.status || {};
+  const hw = data.hardware || {};
+  const dev = hw.device || {};
+  const accels = hw.accelerators || [];
+  const recs = hw.recommendations || {};
+  document.getElementById('status-content').innerHTML = `
+    <div class="card">
+      <h2>Device Info</h2>
+      <div class="stat-grid">
+        <div class="stat-box"><div class="stat-label">Model</div><div class="stat-value" style="font-size:13px">${dev.model||s.device||'—'}</div></div>
+        <div class="stat-box"><div class="stat-label">SoC</div><div class="stat-value" style="font-size:13px">${dev.soc||s.soc||'—'}</div></div>
+        <div class="stat-box" title="JVM heap limit, not physical device RAM"><div class="stat-label">JVM Heap Max</div><div class="stat-value">${dev.ram_mb||'—'}<span class="stat-unit">MB</span></div></div>
+        <div class="stat-box"><div class="stat-label">CPU Cores</div><div class="stat-value">${dev.cpu_cores||'—'}</div></div>
+        <div class="stat-box"><div class="stat-label">Uptime</div><div class="stat-value">${s.uptime_seconds||0}<span class="stat-unit">s</span></div></div>
+        <div class="stat-box"><div class="stat-label">Requests</div><div class="stat-value">${s.total_requests||0}</div></div>
+        <div class="stat-box"><div class="stat-label">Ping</div><div class="stat-value">${data.ping}<span class="stat-unit">ms</span></div></div>
+        <div class="stat-box"><div class="stat-label">Best Accel</div><div class="stat-value" style="font-size:13px;color:var(--accent2)">${s.best_accelerator||'CPU'}</div></div>
+      </div>
+    </div>
+    ${Object.keys(recs).length ? `
+    <div class="card">
+      <h2>Recommendations</h2>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        ${Object.entries(recs).map(([task, accel]) => `
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;min-width:140px">
+            <div style="font-size:11px;color:var(--muted)">${task.replace(/_/g,' ')}</div>
+            <div style="font-weight:600;color:var(--accent2)">${accel}</div>
+          </div>`).join('')}
+      </div>
+    </div>` : ''}
+    <div class="card">
+      <h2>Accelerators</h2>
+      <div class="hw-grid">
+        ${accels.map(a => `
+          <div class="hw-card">
+            <div class="hw-type">${a.type||''}</div>
+            <div class="hw-name">${a.name||'—'}</div>
+            <div class="hw-tops">${a.estimated_tops||0}</div>
+            <div style="font-size:10px;color:var(--muted)">TOPS · ${a.available ? '<span style="color:var(--green)">Available</span>' : '<span style="color:var(--red)">Unavailable</span>'}</div>
+          </div>`).join('') || '<div style="color:var(--muted)">No accelerator data</div>'}
+      </div>
+    </div>`;
+}
+
+function showStatusError(msg) {
+  document.getElementById('status-content').innerHTML = `<div class="alert error">Error: ${msg}</div>`;
+}
+
+async function removeDevice(key) {
+  await fetch(`/api/devices/${encodeURIComponent(key)}`, {method:'DELETE'});
+  if (selectedDevice === key) {
+    selectedDevice = null;
+    document.getElementById('topbar-device').textContent = '— None —';
+    document.getElementById('topbar-ping').style.display = 'none';
+    document.getElementById('status-content').innerHTML = '<div class="empty-state"><div class="icon">📱</div>Select or add a device to get started</div>';
+  }
+  loadDevices();
+}
+
+// ── Add Modal ─────────────────────────────────────────────────────────────────
+
+function openAddModal() { document.getElementById('add-modal').classList.add('open'); document.getElementById('add-host').focus(); }
+function closeAddModal() { document.getElementById('add-modal').classList.remove('open'); document.getElementById('add-modal-alert').innerHTML=''; }
+
+async function addDevice() {
+  const btn = document.getElementById('add-btn');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Connecting...';
+  const res = await fetch('/api/devices', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({host: document.getElementById('add-host').value, port: document.getElementById('add-port').value, api_key: document.getElementById('add-key').value})
+  });
+  const data = await res.json();
+  btn.disabled = false; btn.innerHTML = 'Connect';
+  if (data.success) {
+    closeAddModal();
+    await loadDevices();
+    selectDevice(data.key);
+  } else {
+    document.getElementById('add-modal-alert').innerHTML = `<div class="alert error">${data.error}</div>`;
+  }
+}
+
+// ── Discover Modal ────────────────────────────────────────────────────────────
+
+function openDiscoverModal() { document.getElementById('discover-modal').classList.add('open'); }
+function closeDiscoverModal() { document.getElementById('discover-modal').classList.remove('open'); document.getElementById('discover-alert').innerHTML=''; }
+
+async function runDiscover() {
+  const btn = document.getElementById('disc-btn');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Scanning...';
+  const res = await fetch('/api/discover', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({subnet: document.getElementById('disc-subnet').value, port: document.getElementById('disc-port').value})
+  });
+  const data = await res.json();
+  btn.disabled = false; btn.innerHTML = 'Scan';
+  document.getElementById('discover-alert').innerHTML = `<div class="alert ${data.found > 0 ? 'success' : 'error'}">Found ${data.found} device(s)</div>`;
+  await loadDevices();
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', t.textContent.toLowerCase().replace(' ','') === name || (name==='llm' && t.textContent==='LLM Chat')));
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + name));
+  if (name === 'models') loadModels();
+  if (name === 'detect') refreshDetectModels();
+  if (name === 'classify') refreshClassifyModels();
+  if (name === 'llm') refreshLlmModels();
+  if (name === 'rembg') refreshRembgModels();
+}
+
+// ── Model selectors ───────────────────────────────────────────────────────────
+
+const DETECT_DEFAULTS = ['ssd_mobilenet_v2.tflite'];
+const CLASSIFY_DEFAULTS = ['efficientnet_lite0.tflite'];
+const REMBG_DEFAULTS = [
+  {name: 'rmbg2.tflite',             label: 'rmbg2.tflite — RMBG-1.4 (built-in, 176MB)'},
+];
+const COLORS = ['#6c63ff','#22c55e','#ef4444','#f59e0b','#06b6d4','#ec4899','#84cc16','#f97316'];
+
+async function getLoadedModels() {
+  if (!selectedDevice) return [];
+  try {
+    const res = await fetch(`/api/models?device=${encodeURIComponent(selectedDevice)}`);
+    const data = await res.json();
+    return (data.models || []).map(m => ({name: m.name, type: m.type}));
+  } catch { return []; }
+}
+
+async function fetchDeviceModels() {
+  if (!selectedDevice) return [];
+  try {
+    const res = await fetch(`/api/models?device=${encodeURIComponent(selectedDevice)}`);
+    const data = await res.json();
+    return data.models || [];
+  } catch { return []; }
+}
+
+async function refreshDetectModels() {
+  const sel = document.getElementById('det-model');
+  const cur = sel.value;
+  const models = await fetchDeviceModels();
+  const names = models.filter(m => !m.name.endsWith('.gguf')).map(m => m.name);
+  if (names.length) sel.innerHTML = names.map(n => `<option value="${n}" ${n===cur?'selected':''}>${n}</option>`).join('');
+}
+
+async function refreshClassifyModels() {
+  const sel = document.getElementById('cls-model');
+  const cur = sel.value;
+  const models = await fetchDeviceModels();
+  const names = models.filter(m => !m.name.endsWith('.gguf')).map(m => m.name);
+  if (names.length) sel.innerHTML = names.map(n => `<option value="${n}" ${n===cur?'selected':''}>${n}</option>`).join('');
+}
+
+async function refreshLlmModels() {
+  const sel = document.getElementById('llm-model');
+  const cur = sel.value;
+  const models = await fetchDeviceModels();
+  const names = models.filter(m => m.name.endsWith('.gguf')).map(m => m.name);
+  if (names.length) sel.innerHTML = names.map(n => `<option value="${n}" ${n===cur?'selected':''}>${n}</option>`).join('');
+}
+
+async function refreshRembgModels() {
+  const sel = document.getElementById('rembg-model');
+  const cur = sel.value;
+  const models = await fetchDeviceModels();
+  const names = models.filter(m => m.type === 'SEGMENTATION' || m.name.endsWith('.onnx')).map(m => m.name);
+  if (names.length) sel.innerHTML = names.map(n => `<option value="${n}" ${n===cur?'selected':''}>${n}</option>`).join('');
+}
+
+// ── Image loading ─────────────────────────────────────────────────────────────
+
+let detFile = null, clsFile = null;
+
+// Resize image to max dimension before sending (model only needs 300px)
+function resizeImageFile(file, maxDim = 640) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      c.toBlob(blob => resolve(new File([blob], file.name, {type: 'image/jpeg'})), 'image/jpeg', 0.92);
+    };
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+function loadDetectImage(input) {
+  const file = input.files[0]; if (!file) return;
+  const canvas = document.getElementById('det-canvas');
+  const placeholder = document.getElementById('det-placeholder');
+  const img = new Image();
+  img.onload = () => {
+    canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+    canvas.getContext('2d').drawImage(img, 0, 0);
+    canvas.style.display = 'block';
+    placeholder.style.display = 'none';
+  };
+  img.src = URL.createObjectURL(file);
+  // Store original for bbox drawing, resized for upload
+  resizeImageFile(file).then(f => { detFile = f; });
+}
+
+function loadClassifyImage(input) {
+  const file = input.files[0]; if (!file) return;
+  const preview = document.getElementById('cls-preview');
+  const placeholder = document.getElementById('cls-placeholder');
+  preview.src = URL.createObjectURL(file);
+  preview.style.display = 'block';
+  placeholder.style.display = 'none';
+  resizeImageFile(file).then(f => { clsFile = f; });
+}
+
+function setupDrop(id, loadFn, inputId) {
+  const drop = document.getElementById(id);
+  drop.addEventListener('click', () => document.getElementById(inputId).click());
+  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('drag'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('drag'));
+  drop.addEventListener('drop', e => {
+    e.preventDefault(); drop.classList.remove('drag');
+    const file = e.dataTransfer.files[0]; if (!file) return;
+    const dt = new DataTransfer(); dt.items.add(file);
+    const input = document.getElementById(inputId);
+    input.files = dt.files;
+    loadFn({files: dt.files});
+  });
+}
+
+// ── Detect ────────────────────────────────────────────────────────────────────
+
+async function runDetect() {
+  if (!selectedDevice) return alert('Select a device first');
+  if (!detFile) return alert('Upload an image first');
+  const btn = document.getElementById('det-btn');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Running...';
+  const fd = new FormData();
+  fd.append('device', selectedDevice);
+  fd.append('image', detFile);
+  fd.append('model', document.getElementById('det-model').value);
+  fd.append('confidence', document.getElementById('det-conf').value);
+  fd.append('accelerator', document.getElementById('det-accel').value);
+  try {
+    const res = await fetch('/api/detect', {method:'POST', body:fd});
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    const dets = data.detections || [];
+    drawDetections(dets);
+    const resultEl = document.getElementById('det-result');
+    if (dets.length === 0) {
+      resultEl.innerHTML = '<div style="color:var(--muted)">No detections above threshold</div>';
+    } else {
+      resultEl.innerHTML = dets.map((d, i) => `
+        <div class="detection-item">
+          <div style="flex:1">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="width:10px;height:10px;border-radius:2px;background:${COLORS[i%COLORS.length]};flex-shrink:0"></span>
+              <span class="det-label">${d.label}</span>
+            </div>
+            <div style="background:var(--border);border-radius:2px;height:4px;margin-top:5px">
+              <div style="background:${COLORS[i%COLORS.length]};width:${Math.round(d.confidence*100)}%;height:100%;border-radius:2px"></div>
+            </div>
+          </div>
+          <div class="det-conf" style="margin-left:10px">${(d.confidence*100).toFixed(1)}%</div>
+        </div>`).join('');
+    }
+  } catch(e) {
+    document.getElementById('det-result').innerHTML = `<div class="alert error">${e.message}</div>`;
+  }
+  btn.disabled = false; btn.innerHTML = 'Run Detection';
+}
+
+function drawDetections(dets) {
+  const canvas = document.getElementById('det-canvas');
+  const ctx = canvas.getContext('2d');
+  const img = new Image();
+  img.onload = () => {
+    ctx.drawImage(img, 0, 0);
+    dets.forEach((d, i) => {
+      const b = d.bbox;
+      const color = COLORS[i % COLORS.length];
+      const w = canvas.width, h = canvas.height;
+      // bbox values are normalized [0,1] or absolute pixels — handle both
+      const isNorm = b.left <= 1 && b.top <= 1 && b.right <= 1 && b.bottom <= 1;
+      const x = isNorm ? b.left * w : b.left;
+      const y = isNorm ? b.top * h : b.top;
+      const bw = isNorm ? (b.right - b.left) * w : (b.right - b.left);
+      const bh = isNorm ? (b.bottom - b.top) * h : (b.bottom - b.top);
+      ctx.strokeStyle = color; ctx.lineWidth = 3;
+      ctx.strokeRect(x, y, bw, bh);
+      ctx.fillStyle = color;
+      const label = `${d.label} ${(d.confidence*100).toFixed(0)}%`;
+      const fontSize = Math.max(14, w * 0.018);
+      ctx.font = `bold ${fontSize}px sans-serif`;
+      const tw = ctx.measureText(label).width;
+      ctx.fillRect(x, y - fontSize - 6, tw + 10, fontSize + 8);
+      ctx.fillStyle = '#fff';
+      ctx.fillText(label, x + 5, y - 4);
+    });
+  };
+  img.src = URL.createObjectURL(detFile);
+}
+
+// ── Classify ──────────────────────────────────────────────────────────────────
+
+async function runClassify() {
+  if (!selectedDevice) return alert('Select a device first');
+  if (!clsFile) return alert('Upload an image first');
+  const btn = document.getElementById('cls-btn');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Running...';
+  const fd = new FormData();
+  fd.append('device', selectedDevice);
+  fd.append('image', clsFile);
+  fd.append('model', document.getElementById('cls-model').value);
+  fd.append('top_k', document.getElementById('cls-topk').value);
+  try {
+    const res = await fetch('/api/classify', {method:'POST', body:fd});
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    const items = data.classifications || [];
+    document.getElementById('cls-result').innerHTML = items.length
+      ? items.map((c, i) => `
+        <div class="detection-item">
+          <div style="flex:1">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:12px;color:var(--muted);width:18px">#${i+1}</span>
+              <span class="det-label">${c.label}</span>
+            </div>
+            <div style="background:var(--border);border-radius:2px;height:4px;margin-top:5px">
+              <div style="background:${COLORS[i%COLORS.length]};width:${Math.round(c.confidence*100)}%;height:100%;border-radius:2px"></div>
+            </div>
+          </div>
+          <div class="det-conf" style="margin-left:10px">${(c.confidence*100).toFixed(1)}%</div>
+        </div>`).join('')
+      : '<div style="color:var(--muted)">No results</div>';
+  } catch(e) {
+    document.getElementById('cls-result').innerHTML = `<div class="alert error">${e.message}</div>`;
+  }
+  btn.disabled = false; btn.innerHTML = 'Run Classification';
+}
+
+// ── LLM Chat ──────────────────────────────────────────────────────────────────
+
+function clearChat() { chatHistory = []; document.getElementById('chat-log').innerHTML = ''; document.getElementById('llm-meta').textContent = ''; }
+
+function appendMsg(role, text, meta) {
+  const log = document.getElementById('chat-log');
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+  div.innerHTML = text.replace(/\n/g,'<br>') + (meta ? `<div class="meta">${meta}</div>` : '');
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+
+async function sendChat() {
+  if (!selectedDevice) return alert('Select a device first');
+  const input = document.getElementById('llm-prompt');
+  const prompt = input.value.trim();
+  if (!prompt) return;
+  input.value = '';
+  chatHistory.push({role:'user', content:prompt});
+  appendMsg('user', prompt);
+  const btn = document.getElementById('llm-btn');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+  try {
+    const res = await fetch('/api/llm/chat', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        device: selectedDevice,
+        messages: chatHistory,
+        max_tokens: parseInt(document.getElementById('llm-maxtok').value),
+        temperature: parseFloat(document.getElementById('llm-temp').value),
+        model: document.getElementById('llm-model').value,
+      })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    const reply = data.text || data.choices?.[0]?.message?.content || JSON.stringify(data);
+    chatHistory.push({role:'assistant', content:reply});
+    appendMsg('assistant', reply, data.tokens_per_second ? `${data.tokens_generated} tokens · ${data.tokens_per_second} tok/s · ${data.total_ms}ms · ${data.accelerator}` : '');
+  } catch(e) {
+    appendMsg('assistant', `Error: ${e.message}`);
+  }
+  btn.disabled = false; btn.innerHTML = 'Send';
+}
+
+// ── Remove Background ─────────────────────────────────────────────────────────
+
+let rembgFile = null;
+
+function loadRembgImage(input) {
+  const file = input.files[0]; if (!file) return;
+  const preview = document.getElementById('rembg-preview');
+  const placeholder = document.getElementById('rembg-placeholder');
+  preview.src = URL.createObjectURL(file);
+  preview.style.display = 'block';
+  placeholder.style.display = 'none';
+  document.getElementById('rembg-result').style.display = 'none';
+  document.getElementById('rembg-result-placeholder').style.display = 'flex';
+  document.getElementById('rembg-download').style.display = 'none';
+  document.getElementById('rembg-meta').textContent = '';
+  resizeImageFile(file, 1024).then(f => { rembgFile = f; });
+}
+
+async function runRembg() {
+  if (!selectedDevice) return alert('Select a device first');
+  if (!rembgFile) return alert('Upload an image first');
+  const btn = document.getElementById('rembg-btn');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Processing...';
+  const fd = new FormData();
+  fd.append('device', selectedDevice);
+  fd.append('image', rembgFile);
+  fd.append('model', document.getElementById('rembg-model').value);
+  try {
+    const res = await fetch('/api/rembg', {method:'POST', body:fd});
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    const src = `data:image/png;base64,${data.result}`;
+    const resultImg = document.getElementById('rembg-result');
+    resultImg.src = src;
+    resultImg.style.display = 'block';
+    document.getElementById('rembg-result-placeholder').style.display = 'none';
+    const dl = document.getElementById('rembg-download');
+    dl.href = src; dl.style.display = '';
+    document.getElementById('rembg-meta').textContent =
+      `${data.width}×${data.height}px · ${Math.round(data.inference_ms)}ms · ${data.accelerator}`;
+  } catch(e) {
+    document.getElementById('rembg-meta').textContent = '';
+    alert('Error: ' + e.message);
+  }
+  btn.disabled = false; btn.innerHTML = 'Remove Background';
+}
+
+async function runRembgBenchmark() {
+  if (!selectedDevice) return alert('Select a device first');
+  const btn = document.getElementById('rembg-bench-btn');
+  const resultEl = document.getElementById('rembg-bench-result');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+  resultEl.innerHTML = '<div style="color:var(--muted);font-size:12px;margin-top:8px">Benchmarking CPU / GPU / NPU...</div>';
+  try {
+    const res = await fetch('/api/rembg/benchmark', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({device: selectedDevice, model: document.getElementById('rembg-model').value})
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    const rows = data.results || [];
+    resultEl.innerHTML = `
+      <div class="result-box" style="margin-top:8px">
+        <div class="bench-row bench-header"><span>Accelerator</span><span>Avg ms</span><span>FPS</span><span>Mem MB</span><span>Status</span><span>Delegate</span></div>
+        ${rows.map(r => `
+          <div class="bench-row">
+            <span style="font-weight:600;color:var(--accent2)">${r.accelerator}</span>
+            <span>${r.success ? r.avg_ms : '—'}</span>
+            <span>${r.success ? r.fps : '—'}</span>
+            <span>${r.success ? r.memory_mb : '—'}</span>
+            <span class="chip ${r.success ? 'good' : 'bad'}">${r.success ? 'OK' : 'FAIL'}</span>
+            <span style="color:var(--muted);font-size:12px">${r.delegate || (r.error||'')}</span>
+          </div>`).join('')}
+      </div>`;
+  } catch(e) {
+    resultEl.innerHTML = `<div class="alert error" style="margin-top:8px">${e.message}</div>`;
+  }
+  btn.disabled = false; btn.innerHTML = 'Benchmark';
+}
+
+// ── Benchmark ─────────────────────────────────────────────────────────────────
+
+async function runBenchmark() {
+  if (!selectedDevice) return alert('Select a device first');
+  const btn = document.getElementById('bench-btn');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Running...';
+  document.getElementById('bench-result').innerHTML = '<div style="color:var(--muted);padding:12px 0">Running benchmark on all accelerators...</div>';
+  try {
+    const res = await fetch('/api/benchmark', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({device:selectedDevice, model:document.getElementById('bench-model').value, model_type:document.getElementById('bench-type').value})
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    const rows = data.results || [];
+    document.getElementById('bench-result').innerHTML = `
+      <div class="result-box">
+        <div class="bench-row bench-header"><span>Accelerator</span><span>Avg ms</span><span>FPS</span><span>Mem MB</span><span>Status</span><span>Delegate</span></div>
+        ${rows.map(r => `
+          <div class="bench-row">
+            <span style="font-weight:600;color:var(--accent2)">${r.accelerator}</span>
+            <span>${r.success ? r.avg_ms : '—'}</span>
+            <span>${r.success ? r.fps : '—'}</span>
+            <span>${r.success ? r.memory_mb : '—'}</span>
+            <span class="chip ${r.success ? 'good' : 'bad'}">${r.success ? 'OK' : 'FAIL'}</span>
+            <span style="color:var(--muted);font-size:12px">${r.delegate || (r.error||'')}</span>
+          </div>`).join('')}
+      </div>`;
+  } catch(e) {
+    document.getElementById('bench-result').innerHTML = `<div class="alert error">${e.message}</div>`;
+  }
+  btn.disabled = false; btn.innerHTML = 'Run Benchmark';
+}
+
+// ── Models ────────────────────────────────────────────────────────────────────
+
+async function loadModels() {
+  if (!selectedDevice) { document.getElementById('models-list').innerHTML = '<div style="color:var(--muted)">Select a device first</div>'; return; }
+  try {
+    const res = await fetch(`/api/models?device=${encodeURIComponent(selectedDevice)}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    const models = data.models || [];
+    document.getElementById('models-list').innerHTML = models.length
+      ? models.map(m => `<div class="detection-item"><span class="det-label">${m.name||m}</span><span style="color:var(--muted);font-size:12px">${m.type||''}</span></div>`).join('')
+      : '<div style="color:var(--muted)">No models loaded</div>';
+  } catch(e) {
+    document.getElementById('models-list').innerHTML = `<div class="alert error">${e.message}</div>`;
+  }
+}
+
+async function uploadModel(input) {
+  if (!selectedDevice) return alert('Select a device first');
+  const file = input.files[0];
+  if (!file) return;
+  const modelType = document.getElementById('upload-model-type').value;
+  const fd = new FormData();
+  fd.append('device', selectedDevice);
+  fd.append('model', file);
+  fd.append('model_type', modelType);
+  const listEl = document.getElementById('models-list');
+  listEl.innerHTML = `<div style="color:var(--muted)">Uploading and loading ${file.name}… <span class="spinner"></span></div>`;
+  try {
+    const res = await fetch('/api/models/upload', {method:'POST', body:fd});
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    listEl.innerHTML = `<div class="alert success">✓ Uploaded and loaded: ${data.name} (${(data.size_mb||0).toFixed(1)} MB)</div>`;
+    await loadModels();
+  } catch(e) {
+    listEl.innerHTML = `<div class="alert error">Upload failed: ${e.message}</div>`;
+  }
+  input.value = '';
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+
+document.getElementById('add-host').addEventListener('keydown', e => e.key === 'Enter' && addDevice());
+
+setupDrop('det-drop', loadDetectImage, 'det-file');
+setupDrop('cls-drop', loadClassifyImage, 'cls-file');
+setupDrop('rembg-drop', loadRembgImage, 'rembg-file');
+
+// Close modals on overlay click
+document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if(e.target===o) o.classList.remove('open'); }));
+
+loadDevices();
+</script>
+</body>
+</html>
