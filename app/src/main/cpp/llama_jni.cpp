@@ -1,6 +1,7 @@
 #include <jni.h>
 #include <string>
 #include <vector>
+#include <cstring>
 #include <android/log.h>
 #include "llama.h"
 #include "ggml.h"

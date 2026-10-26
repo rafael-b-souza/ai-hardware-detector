@@ -13,9 +13,9 @@ android {
         targetSdk 34
         versionCode 1
         versionName "1.0"
-        // Build only for arm64 — S22 is arm64, keeps APK small
+        // Multi-architecture support for NDK builds: arm64-v8a (flagships/NEON), armeabi-v7a (legacy 32-bit), x86_64 (emulators)
         ndk {
-            abiFilters "arm64-v8a"
+            abiFilters "arm64-v8a", "armeabi-v7a", "x86_64"
         }
     }
 
