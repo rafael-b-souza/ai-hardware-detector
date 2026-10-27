@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main, master, dev ]
     paths:
-      - 'app/src/main/cpp/**'
+      - 'app/src/main/**'
       - 'app/build.gradle'
       - 'build.gradle'
       - 'CMakeLists.txt'
@@ -12,7 +12,7 @@ on:
   pull_request:
     branches: [ main, master, dev ]
     paths:
-      - 'app/src/main/cpp/**'
+      - 'app/src/main/**'
       - 'app/build.gradle'
       - 'build.gradle'
       - 'CMakeLists.txt'
