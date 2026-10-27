@@ -37,7 +37,7 @@ class BenchmarkRunner(private val context: Context) {
         private const val BENCHMARK_RUNS = 20
     }
 
-    fun benchmarkModel(
+    suspend fun benchmarkModel(
         modelPath: String,
         modelType: ModelType,
         inputShape: IntArray = intArrayOf(1, 224, 224, 3),
