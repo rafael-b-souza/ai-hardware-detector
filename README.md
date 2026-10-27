@@ -1,5 +1,6 @@
 # AI Hardware Detector & On-Device LLM Runtime
 
+[![Build Status](https://github.com/rafael-b-souza/ai-hardware-detector/actions/workflows/build-ndk.yml/badge.svg)](https://github.com/rafael-b-souza/ai-hardware-detector/actions/workflows/build-ndk.yml)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.0-purple.svg)](https://kotlinlang.org)
 [![C++17 NDK](https://img.shields.io/badge/NDK-r27c%20(C%2B%2B17)-blue.svg)](https://developer.android.com/ndk)
 [![llama.cpp](https://img.shields.io/badge/Engine-llama.cpp%20GGUF-green.svg)](https://github.com/ggerganov/llama.cpp)

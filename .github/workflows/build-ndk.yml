@@ -82,6 +82,7 @@ jobs:
             -DANDROID_PLATFORM=android-28 \
             -DCMAKE_BUILD_TYPE=Release \
             -DGGML_VULKAN=OFF \
+            -DGGML_LLAMAFILE=OFF \
             app/src/main/cpp
 
       - name: Build llama_jni Shared Library (${{ matrix.abi }})
